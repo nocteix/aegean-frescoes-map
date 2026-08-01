@@ -14,11 +14,6 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet.fullscreen@3.0.2/Control.FullScreen.css"
     integrity="sha384-PALxxXbG28eiE9bT7yKmsbjd4Ta3qKMLlzsrp6G+05f4Nltt4ktlg1l7e4RPeNEa" crossorigin="anonymous" />
   <link rel="stylesheet" href="assets/css/style.css" />
-
-  <link rel="manifest" href="manifest.json">
-  <meta name="theme-color" content="#241f1a">
-  <link rel="icon" type="image/png" href="assets/icons/icon-192.png">
-  <link rel="apple-touch-icon" href="assets/icons/icon-192.png">
 </head>
 <body>
 
@@ -70,7 +65,7 @@
 
       <details class="note">
         <summary>About</summary>
-        Made by <span class="credit-handle">@philopalaia</span>.
+        Made by <span class="credit-handle">@nocteix</span>.
       </details>
     </aside>
 
@@ -86,24 +81,5 @@
     integrity="sha384-l0YxV5zMlsDoa/OatH90j4WDu9eFcFTMBjn1+AZN39VXC/k+uKAu3RTciIg3Te2t" crossorigin="anonymous"></script>
   <script src="assets/js/data.js"></script>
   <script src="assets/js/app.js"></script>
-
-  <script>
-    // Offline mode has been removed. This actively unregisters any service
-    // worker a browser may have installed from an earlier version of this
-    // site and clears its caches -- without this, a previously-installed
-    // service worker keeps controlling the page and can go on serving old
-    // cached files indefinitely, even after index.html/app.js/style.css
-    // are replaced on disk.
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.getRegistrations().then((registrations) => {
-        registrations.forEach((registration) => registration.unregister());
-      });
-    }
-    if ('caches' in window) {
-      caches.keys().then((keys) => {
-        keys.forEach((key) => caches.delete(key));
-      });
-    }
-  </script>
 </body>
 </html>
