@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Aegean Frescoes Atlas</title>
+
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css"
+    integrity="sha384-pmjIAcz2bAn0xukfxADbZIb3t8oRT9Sv0rvO+BR5Csr6Dhqq+nZs59P0pPKQJkEV" crossorigin="anonymous" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css"
+    integrity="sha384-wgw+aLYNQ7dlhK47ZPK7FRACiq7ROZwgFNg0m04avm4CaXS+Z9Y7nMu8yNjBKYC+" crossorigin="anonymous" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.fullscreen@3.0.2/Control.FullScreen.css"
+    integrity="sha384-PALxxXbG28eiE9bT7yKmsbjd4Ta3qKMLlzsrp6G+05f4Nltt4ktlg1l7e4RPeNEa" crossorigin="anonymous" />
+  <link rel="stylesheet" href="assets/css/style.css" />
+
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#241f1a">
+  <link rel="icon" type="image/png" href="assets/icons/icon-192.png">
+  <link rel="apple-touch-icon" href="assets/icons/icon-192.png">
+</head>
+<body>
+
+  <a class="skip-link" href="#map-container">Skip to map</a>
+
+  <header class="app-header">
+    <div class="header-brand">
+      <h1>Aegean Frescoes Atlas</h1>
+      <span>Interactive Map of Bronze Age Murals</span>
+    </div>
+  </header>
+
+  <div class="app-container">
+
+    <aside class="sidebar" aria-label="Filters and fresco search">
+      <fieldset class="filter-group-wrap timeline-filter-wrap" id="timeline-filter-wrap">
+        <legend>Time Period</legend>
+        <div class="timeline-slider" id="timeline-slider">
+          <div class="timeline-track"></div>
+          <div class="timeline-range-fill" id="timeline-range-fill"></div>
+          <input type="range" id="timeline-min" aria-label="Earliest date">
+          <input type="range" id="timeline-max" aria-label="Latest date">
+        </div>
+        <div class="timeline-labels">
+          <span id="timeline-min-label"></span>
+          <span id="timeline-max-label"></span>
+        </div>
+        <button type="button" class="timeline-reset" id="timeline-reset">Reset range</button>
+      </fieldset>
+
+      <div class="search-panel" role="search">
+        <label for="search-input">Find a fresco</label>
+        <input type="text" id="search-input" placeholder="Search by title or site&hellip;" autocomplete="off">
+        <button type="button" class="browse-all-toggle" id="browse-all-toggle" aria-pressed="false">List all visible frescoes</button>
+        <div class="results-list" id="results-list" role="group" aria-label="Frescoes" aria-live="polite"></div>
+      </div>
+
+      <div class="legend">
+        <h2>Legend &mdash; tap to filter by culture</h2>
+        <div class="legend-items" id="legend-items" role="group" aria-label="Filter by culture"></div>
+      </div>
+
+      <div class="stats-panel" aria-live="polite">
+        <span class="stats-line">
+          Showing <strong id="visible-count">0</strong> <span id="stats-noun">frescoes</span>
+        </span>
+        <button type="button" class="clear-filters" id="clear-filters">Clear all filters</button>
+      </div>
+
+      <details class="note">
+        <summary>About</summary>
+        Made by <span class="credit-handle">@philopalaia</span>.
+      </details>
+    </aside>
+
+    <main id="map-container" tabindex="-1" aria-label="Map of Aegean fresco locations"></main>
+
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"
+    integrity="sha384-eXVCORTRlv4FUUgS/xmOyr66XBVraen8ATNLMESp92FKXLAMiKkerixTiBvXriZr" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/leaflet.fullscreen@3.0.2/Control.FullScreen.js"
+    integrity="sha384-l0YxV5zMlsDoa/OatH90j4WDu9eFcFTMBjn1+AZN39VXC/k+uKAu3RTciIg3Te2t" crossorigin="anonymous"></script>
+  <script src="assets/js/data.js"></script>
+  <script src="assets/js/app.js"></script>
+
+  <script>
+    // Offline mode has been removed. This actively unregisters any service
+    // worker a browser may have installed from an earlier version of this
+    // site and clears its caches -- without this, a previously-installed
+    // service worker keeps controlling the page and can go on serving old
+    // cached files indefinitely, even after index.html/app.js/style.css
+    // are replaced on disk.
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then((registrations) => {
+        registrations.forEach((registration) => registration.unregister());
+      });
+    }
+    if ('caches' in window) {
+      caches.keys().then((keys) => {
+        keys.forEach((key) => caches.delete(key));
+      });
+    }
+  </script>
+</body>
+</html>
