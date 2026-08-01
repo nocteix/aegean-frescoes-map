@@ -1,8 +1,8 @@
-Aegean Frescoes Atlas
+## Aegean Frescoes Atlas
 
 An interactive Leaflet map of Bronze Age Aegean frescoes (Minoan, Mycenaean, Cycladic), with culture-based filtering, a date-range timeline slider, search, and an image lightbox.
 
-Project structure
+## Project structure
 
 index.html              Entry point
 assets/
@@ -17,7 +17,7 @@ validate_dataset.py     Sanity-checks the generated data.geojson
 
 Leaflet, Leaflet.markercluster, and Leaflet.fullscreen are loaded from a CDN. Everything else is local and static.
 
-Data pipeline
+## Data pipeline
 
 frescoes.csv
     │
