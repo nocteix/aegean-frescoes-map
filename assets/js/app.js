@@ -18,7 +18,12 @@ function initMap(features) {
   const prefersReducedMotion = window.matchMedia
     && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-  const baseCultureColors = { Minoan: '#a8354b', Mycenaean: '#8a6a1c', Cycladic: '#2f6f8f' };
+  const baseCultureColors = { 
+    Minoan: '#a8354b', 
+    Mycenaean: '#8a6a1c', 
+    Cycladic: '#2f6f8f',
+    Egyptian: '#d97706' 
+  };
   const fallbackPalette = ['#5b7f37', '#7d4f9e', '#c1622d', '#3c8f7a', '#8f4a6b'];
   const assignedColors = {};
 
@@ -31,17 +36,47 @@ function initMap(features) {
     return assignedColors[culture];
   }
 
+  const defaultCenter = [31.5, 27.5];
+  const defaultZoom = 5;
+
   const map = L.map('map-container', {
     zoomControl: false,
     zoomAnimation: !prefersReducedMotion,
     markerZoomAnimation: !prefersReducedMotion,
     fadeAnimation: !prefersReducedMotion
-  }).setView([36.6, 24.5], 7);
+  }).setView(defaultCenter, defaultZoom);
 
   L.control.zoom({ position: 'bottomright' }).addTo(map);
 
-  map.setMaxBounds([[28, 5], [48, 35]]);
-  map.setMinZoom(5);
+  const HomeControl = L.Control.extend({
+    options: { position: 'bottomright' },
+    onAdd: function() {
+      const container = L.DomUtil.create('div', 'leaflet-bar leaflet-control');
+      const button = L.DomUtil.create('a', 'leaflet-control-home', container);
+      button.href = '#';
+      button.title = 'Reset map view';
+      button.setAttribute('role', 'button');
+      button.setAttribute('aria-label', 'Reset map view');
+      button.innerHTML = '\u2302'; // Home symbol via unicode escape sequence
+      button.style.fontSize = '18px';
+      button.style.lineHeight = '30px';
+      button.style.textAlign = 'center';
+      button.style.fontWeight = 'bold';
+
+      L.DomEvent.disableClickPropagation(container);
+      L.DomEvent.on(button, 'click', (e) => {
+        e.preventDefault();
+        map.setView(defaultCenter, defaultZoom, { animate: !prefersReducedMotion });
+      });
+
+      return container;
+    }
+  });
+
+  map.addControl(new HomeControl());
+
+  map.setMaxBounds([[18, -5], [48, 40]]);
+  map.setMinZoom(4);
 
   if (L.control.fullscreen) {
     L.control.fullscreen({ position: 'topright' }).addTo(map);
@@ -71,13 +106,27 @@ function initMap(features) {
   const clearFiltersBtn = document.getElementById('clear-filters');
 
   let selectedCulture = 'all';
-
   let browseAllActive = false;
 
   let timelineBoundsMin = null;
   let timelineBoundsMax = null;
 
   const markersById = new Map();
+
+  function zoomToCulture(culture) {
+    const cultureFeatures = features.filter(f => f.properties.culture === culture);
+    if (cultureFeatures.length === 0) return;
+
+    const bounds = L.latLngBounds(
+      cultureFeatures.map(f => [f.geometry.coordinates[1], f.geometry.coordinates[0]])
+    );
+
+    map.fitBounds(bounds, { 
+      padding: [50, 50], 
+      maxZoom: 9, 
+      animate: !prefersReducedMotion 
+    });
+  }
 
   const lightbox = document.createElement('div');
   lightbox.className = 'lightbox';
@@ -181,7 +230,7 @@ function initMap(features) {
     const ends = features.map(f => f.properties.dateEnd).filter(v => typeof v === 'number');
 
     if (starts.length === 0 || ends.length === 0) {
-      timelineWrap.hidden = true;
+      if (timelineWrap) timelineWrap.hidden = true;
       return;
     }
 
@@ -190,12 +239,14 @@ function initMap(features) {
 
     const step = 25;
     [timelineMinInput, timelineMaxInput].forEach(input => {
-      input.min = timelineBoundsMin;
-      input.max = timelineBoundsMax;
-      input.step = step;
+      if (input) {
+        input.min = timelineBoundsMin;
+        input.max = timelineBoundsMax;
+        input.step = step;
+      }
     });
-    timelineMinInput.value = timelineBoundsMin;
-    timelineMaxInput.value = timelineBoundsMax;
+    if (timelineMinInput) timelineMinInput.value = timelineBoundsMin;
+    if (timelineMaxInput) timelineMaxInput.value = timelineBoundsMax;
 
     function clampAndRender(moved) {
       const minGap = step;
@@ -214,29 +265,34 @@ function initMap(features) {
       renderMarkers();
     }
 
-    timelineMinInput.addEventListener('input', () => clampAndRender('min'));
-    timelineMaxInput.addEventListener('input', () => clampAndRender('max'));
+    if (timelineMinInput && timelineMaxInput) {
+      timelineMinInput.addEventListener('input', () => clampAndRender('min'));
+      timelineMaxInput.addEventListener('input', () => clampAndRender('max'));
 
-    timelineMinInput.addEventListener('pointerdown', () => {
-      timelineMinInput.style.zIndex = 3;
-      timelineMaxInput.style.zIndex = 2;
-    });
-    timelineMaxInput.addEventListener('pointerdown', () => {
-      timelineMaxInput.style.zIndex = 3;
-      timelineMinInput.style.zIndex = 2;
-    });
+      timelineMinInput.addEventListener('pointerdown', () => {
+        timelineMinInput.style.zIndex = 3;
+        timelineMaxInput.style.zIndex = 2;
+      });
+      timelineMaxInput.addEventListener('pointerdown', () => {
+        timelineMaxInput.style.zIndex = 3;
+        timelineMinInput.style.zIndex = 2;
+      });
+    }
 
-    timelineReset.addEventListener('click', () => {
-      timelineMinInput.value = timelineBoundsMin;
-      timelineMaxInput.value = timelineBoundsMax;
-      updateTimelineVisuals();
-      renderMarkers();
-    });
+    if (timelineReset) {
+      timelineReset.addEventListener('click', () => {
+        timelineMinInput.value = timelineBoundsMin;
+        timelineMaxInput.value = timelineBoundsMax;
+        updateTimelineVisuals();
+        renderMarkers();
+      });
+    }
 
     updateTimelineVisuals();
   }
 
   function populateFiltersAndLegend() {
+    if (!legendEl) return;
     const cultures = [...new Set(features.map(f => f.properties.culture).filter(Boolean))].sort();
 
     cultures.forEach(culture => {
@@ -250,15 +306,26 @@ function initMap(features) {
       swatch.setAttribute('aria-hidden', 'true');
       item.appendChild(swatch);
       item.appendChild(document.createTextNode(culture));
+
       item.addEventListener('click', () => {
-        selectedCulture = (selectedCulture === culture) ? 'all' : culture;
+        const isDeselecting = (selectedCulture === culture);
+        selectedCulture = isDeselecting ? 'all' : culture;
+        
         renderMarkers();
+
+        if (!isDeselecting) {
+          zoomToCulture(culture);
+        } else {
+          map.setView(defaultCenter, defaultZoom, { animate: !prefersReducedMotion });
+        }
       });
+
       legendEl.appendChild(item);
     });
   }
 
   function updateLegendPressedState() {
+    if (!legendEl) return;
     legendEl.querySelectorAll('.legend-item').forEach(btn => {
       const culture = btn.textContent.trim();
       btn.setAttribute('aria-pressed', String(culture === selectedCulture));
@@ -319,7 +386,12 @@ function initMap(features) {
       const attr = props.imageAttribution;
       const credit = document.createElement('div');
       credit.className = 'image-credit';
-      credit.appendChild(document.createTextNode(`Photo: ${attr.photographer || 'Unknown'}, `));
+
+      const parts = [];
+
+      if (attr.photographer) {
+        parts.push(`Photo: ${attr.photographer}`);
+      }
 
       if (attr.licenseUrl) {
         const licenseLink = document.createElement('a');
@@ -327,22 +399,32 @@ function initMap(features) {
         licenseLink.target = '_blank';
         licenseLink.rel = 'noopener noreferrer';
         licenseLink.textContent = attr.license || 'license';
-        credit.appendChild(licenseLink);
+        parts.push(licenseLink);
       } else if (attr.license) {
-        credit.appendChild(document.createTextNode(attr.license));
+        parts.push(document.createTextNode(attr.license));
       }
 
       if (attr.sourceUrl) {
-        credit.appendChild(document.createTextNode(' \u00b7 '));
         const sourceLink = document.createElement('a');
         sourceLink.href = attr.sourceUrl;
         sourceLink.target = '_blank';
         sourceLink.rel = 'noopener noreferrer';
         sourceLink.textContent = 'source';
-        credit.appendChild(sourceLink);
+        parts.push(sourceLink);
       }
 
-      card.appendChild(credit);
+      parts.forEach((part, idx) => {
+        if (idx > 0) credit.appendChild(document.createTextNode(' \u00b7 '));
+        if (typeof part === 'string') {
+          credit.appendChild(document.createTextNode(part));
+        } else {
+          credit.appendChild(part);
+        }
+      });
+
+      if (credit.childNodes.length > 0) {
+        card.appendChild(credit);
+      }
     }
 
     const badge = document.createElement('span');
@@ -382,10 +464,10 @@ function initMap(features) {
   function renderMarkers() {
     markerCluster.clearLayers();
     markersById.clear();
-    resultsListEl.innerHTML = '';
+    if (resultsListEl) resultsListEl.innerHTML = '';
 
-    const searchTerm = searchInput.value.trim().toLowerCase();
-    const timelineActive = timelineBoundsMin !== null;
+    const searchTerm = searchInput ? searchInput.value.trim().toLowerCase() : '';
+    const timelineActive = timelineBoundsMin !== null && timelineMinInput && timelineMaxInput;
     const timelineMinVal = timelineActive ? Number(timelineMinInput.value) : null;
     const timelineMaxVal = timelineActive ? Number(timelineMaxInput.value) : null;
 
@@ -413,15 +495,28 @@ function initMap(features) {
       markersById.set(f.properties.id, marker);
     });
 
-    visibleCountEl.textContent = filtered.length;
-    statsNounEl.textContent = filtered.length === 1 ? 'fresco' : 'frescoes';
+    const timelineNarrowed = timelineActive && (timelineMinVal > timelineBoundsMin || timelineMaxVal < timelineBoundsMax);
+    const hasActiveFilter = (searchTerm !== '' || timelineNarrowed) && selectedCulture === 'all';
+
+    if (hasActiveFilter && filtered.length > 0) {
+      const bounds = L.latLngBounds(
+        filtered.map(f => [f.geometry.coordinates[1], f.geometry.coordinates[0]])
+      );
+
+      map.fitBounds(bounds, {
+        padding: [50, 50],
+        maxZoom: 9,
+        animate: !prefersReducedMotion
+      });
+    }
+
+    if (visibleCountEl) visibleCountEl.textContent = filtered.length;
+    if (statsNounEl) statsNounEl.textContent = filtered.length === 1 ? 'fresco' : 'frescoes';
 
     updateLegendPressedState();
 
-    const timelineNarrowed = timelineActive
-      && (timelineMinVal > timelineBoundsMin || timelineMaxVal < timelineBoundsMax);
     const anyFilterActive = selectedCulture !== 'all' || searchTerm !== '' || timelineNarrowed;
-    clearFiltersBtn.disabled = !anyFilterActive;
+    if (clearFiltersBtn) clearFiltersBtn.disabled = !anyFilterActive;
 
     if (searchTerm || browseAllActive) {
       renderResultsList(filtered);
@@ -429,6 +524,8 @@ function initMap(features) {
   }
 
   function renderResultsList(matches) {
+    if (!resultsListEl) return;
+
     if (matches.length === 0) {
       const empty = document.createElement('div');
       empty.className = 'result-item';
@@ -491,59 +588,68 @@ function initMap(features) {
 
   window.addEventListener('hashchange', openFromHash);
 
-  clearFiltersBtn.addEventListener('click', () => {
-    selectedCulture = 'all';
-    searchInput.value = '';
-    if (timelineBoundsMin !== null) {
-      timelineMinInput.value = timelineBoundsMin;
-      timelineMaxInput.value = timelineBoundsMax;
-      updateTimelineVisuals();
-    }
-    renderMarkers();
-    searchInput.focus();
-  });
-
-  browseAllToggle.addEventListener('click', () => {
-    browseAllActive = !browseAllActive;
-    browseAllToggle.setAttribute('aria-pressed', String(browseAllActive));
-    browseAllToggle.textContent = browseAllActive
-      ? 'Hide full list'
-      : 'List all visible frescoes';
-    renderMarkers();
-  });
-
-  resultsListEl.addEventListener('keydown', (e) => {
-    const items = Array.from(resultsListEl.querySelectorAll('.result-item'));
-    const currentIndex = items.indexOf(document.activeElement);
-    if (currentIndex === -1) return;
-
-    let nextIndex = null;
-    if (e.key === 'ArrowDown') nextIndex = (currentIndex + 1) % items.length;
-    else if (e.key === 'ArrowUp') nextIndex = (currentIndex - 1 + items.length) % items.length;
-    else if (e.key === 'Home') nextIndex = 0;
-    else if (e.key === 'End') nextIndex = items.length - 1;
-    else if (e.key === 'Escape') { searchInput.focus(); return; }
-
-    if (nextIndex !== null) {
-      e.preventDefault();
-      items[nextIndex].focus();
-    }
-  });
-
-  searchInput.addEventListener('keydown', (e) => {
-    if (e.key === 'ArrowDown') {
-      const first = resultsListEl.querySelector('.result-item');
-      if (first) {
-        e.preventDefault();
-        first.focus();
+  if (clearFiltersBtn) {
+    clearFiltersBtn.addEventListener('click', () => {
+      selectedCulture = 'all';
+      if (searchInput) searchInput.value = '';
+      if (timelineBoundsMin !== null && timelineMinInput && timelineMaxInput) {
+        timelineMinInput.value = timelineBoundsMin;
+        timelineMaxInput.value = timelineBoundsMax;
+        updateTimelineVisuals();
       }
-    }
-  });
+      map.setView(defaultCenter, defaultZoom, { animate: !prefersReducedMotion });
+      renderMarkers();
+      if (searchInput) searchInput.focus();
+    });
+  }
+
+  if (browseAllToggle) {
+    browseAllToggle.addEventListener('click', () => {
+      browseAllActive = !browseAllActive;
+      browseAllToggle.setAttribute('aria-pressed', String(browseAllActive));
+      browseAllToggle.textContent = browseAllActive
+        ? 'Hide full list'
+        : 'List all visible frescoes';
+      renderMarkers();
+    });
+  }
+
+  if (resultsListEl) {
+    resultsListEl.addEventListener('keydown', (e) => {
+      const items = Array.from(resultsListEl.querySelectorAll('.result-item'));
+      const currentIndex = items.indexOf(document.activeElement);
+      if (currentIndex === -1) return;
+
+      let nextIndex = null;
+      if (e.key === 'ArrowDown') nextIndex = (currentIndex + 1) % items.length;
+      else if (e.key === 'ArrowUp') nextIndex = (currentIndex - 1 + items.length) % items.length;
+      else if (e.key === 'Home') nextIndex = 0;
+      else if (e.key === 'End') nextIndex = items.length - 1;
+      else if (e.key === 'Escape') { if (searchInput) searchInput.focus(); return; }
+
+      if (nextIndex !== null) {
+        e.preventDefault();
+        items[nextIndex].focus();
+      }
+    });
+  }
+
+  if (searchInput) {
+    searchInput.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowDown' && resultsListEl) {
+        const first = resultsListEl.querySelector('.result-item');
+        if (first) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
+    });
+
+    searchInput.addEventListener('input', debounce(renderMarkers, 150));
+  }
 
   populateFiltersAndLegend();
   setupTimelineSlider();
-
-  searchInput.addEventListener('input', debounce(renderMarkers, 150));
 
   renderMarkers();
   openFromHash();
