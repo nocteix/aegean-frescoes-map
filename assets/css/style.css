@@ -598,6 +598,21 @@ body {
   border-top: 1px solid #eee2c8;
 }
 
+.leaflet-control-home {
+  display: block;
+  width: 30px;
+  height: 30px;
+  background-color: #fff;
+  color: #333;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.leaflet-control-home:hover {
+  background-color: #f4f4f4;
+  color: #000;
+}
+
 .leaflet-popup-content-wrapper { border-radius: 6px; }
 
 @media (max-width: 768px) {
