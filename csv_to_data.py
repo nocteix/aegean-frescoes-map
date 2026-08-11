@@ -1,116 +1,116 @@
 import csv
 import json
-import re
+import os
 import sys
-from pathlib import Path
 
-REQUIRED_FIELDS = ["id", "title", "culture", "lat", "lng", "imageUrl"]
-
-ID_PATTERN = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
-
-NUMERIC_FIELDS = {"lat", "lng", "dateStart", "dateEnd"}
-
-
-def row_to_feature(row: dict, line_no: int) -> dict:
-    missing = [f for f in REQUIRED_FIELDS if not row.get(f, "").strip()]
-    if missing:
-        raise ValueError(f"Row {line_no} (id={row.get('id', '?')!r}) missing required field(s): {missing}")
-
-    raw_id = row["id"].strip()
-    if not ID_PATTERN.match(raw_id):
-        raise ValueError(
-            f"Row {line_no}: id {raw_id!r} must be lowercase letters/numbers/hyphens only "
-            f"(e.g. 'knossos-bull-leaping') so it can't collide with a same-name id in different case"
-        )
-
-    if None in row:
-        raise ValueError(
-            f"Row {line_no} (id={raw_id!r}) has more columns than the header defines -- "
-            f"check for a stray comma in this row"
-        )
-
-    props = {}
-    image_attribution = {}
-
-    for key, value in row.items():
-        value = (value or "").strip()
-        if value == "":
-            continue 
-
-        if key in ("lat", "lng"):
-            continue  
-
-        if key.startswith("image_"):
-            sub_key = key[len("image_"):]
-            image_attribution[sub_key] = value
-            continue
-
-        if key in NUMERIC_FIELDS:
-            try:
-                props[key] = int(value)
-            except ValueError:
-                props[key] = float(value)
-            continue
-
-        props[key] = value
-
-    if image_attribution:
-        props["imageAttribution"] = image_attribution
-
+def parse_number(val):
+    if val is None or val == '':
+        return None
     try:
-        lat = float(row["lat"])
-        lng = float(row["lng"])
-    except ValueError as e:
-        raise ValueError(f"Row {line_no} (id={row.get('id')!r}) has a non-numeric lat/lng") from e
+        return int(val)
+    except ValueError:
+        try:
+            return float(val)
+        except ValueError:
+            return None
 
-    return {
-        "type": "Feature",
-        "geometry": {"type": "Point", "coordinates": [lng, lat]},
-        "properties": props,
-    }
+def get_field(row, *possible_keys):
+    for key in possible_keys:
+        for csv_key in row.keys():
+            if csv_key and csv_key.strip().lower() == key.lower():
+                val = row[csv_key]
+                if val is not None and str(val).strip() != '':
+                    return str(val).strip()
+    return ""
 
+def clean_url(val):
+    if not val:
+        return ""
+    v = val.strip()
+    if v.startswith(('http://', 'https://')):
+        return v
+    if v.startswith(('www.', '//')):
+        return 'https://' + v.lstrip('/')
+    if '.org' in v or '.com' in v or '.edu' in v or '.gov' in v:
+        return 'https://' + v
+    return ""
 
-def main():
-    if len(sys.argv) != 3:
-        print("Usage: python3 csv_to_data.py <input.csv> <output_dir>")
+def convert_csv_to_js(csv_path='frescoes_cleaned.csv', output_dir='assets/js'):
+    if not os.path.exists(csv_path):
+        print(f"Error: File '{csv_path}' not found.")
         sys.exit(1)
-
-    csv_path = Path(sys.argv[1])
-    out_dir = Path(sys.argv[2])
-    out_dir.mkdir(parents=True, exist_ok=True)
 
     features = []
-    errors = []
 
-    with csv_path.open(newline="", encoding="utf-8") as f:
-        reader = csv.DictReader(f)
-        for i, row in enumerate(reader, start=2):
-            try:
-                features.append(row_to_feature(row, i))
-            except ValueError as e:
-                errors.append(str(e))
+    with open(csv_path, mode='r', encoding='utf-8-sig') as infile:
+        reader = csv.DictReader(infile)
+        
+        for index, row in enumerate(reader, start=1):
+            raw_lat = get_field(row, 'lat', 'latitude', 'site_latitude', 'y')
+            raw_lng = get_field(row, 'lng', 'longitude', 'site_longitude', 'x')
+            
+            lat = parse_number(raw_lat)
+            lng = parse_number(raw_lng)
+            
+            if lat is None or lng is None:
+                continue
 
-    if errors:
-        print(f"Stopped: {len(errors)} row(s) failed to convert:\n")
-        for e in errors:
-            print(f"  - {e}")
-        print("\nFix these rows in the CSV and re-run. No output files were written.")
-        sys.exit(1)
+            photographer = get_field(row, 'image_photographer', 'photographer', 'imageAttographer', 'author')
+            license_name = get_field(row, 'image_license', 'license', 'imageLicense')
+            license_url = clean_url(get_field(row, 'image_licenseUrl', 'licenseUrl', 'license_url'))
+            source_url = clean_url(get_field(row, 'image_sourceUrl', 'sourceUrl', 'source_url', 'source', 'url'))
 
-    feature_collection = {"type": "FeatureCollection", "features": features}
+            citation = get_field(row, 'sourceCitation', 'citation', 'bibliography', 'reference')
 
-    geojson_path = out_dir / "data.geojson"
-    geojson_path.write_text(json.dumps(feature_collection, indent=2, ensure_ascii=False), encoding="utf-8")
+            attribution = {}
+            if photographer: attribution['photographer'] = photographer
+            if license_name: attribution['license'] = license_name
+            if license_url: attribution['licenseUrl'] = license_url
+            if source_url: attribution['sourceUrl'] = source_url
 
-    js_path = out_dir / "data.js"
-    js_content = "const frescoesData = " + json.dumps(feature_collection, indent=2, ensure_ascii=False) + ";\n"
-    js_path.write_text(js_content, encoding="utf-8")
+            properties = {
+                "id": get_field(row, 'id') or f"fresco-{index}",
+                "title": get_field(row, 'title', 'name') or "Untitled Fresco",
+                "culture": get_field(row, 'culture') or "Unknown",
+                "theme": get_field(row, 'theme') or "",
+                "period": get_field(row, 'period') or "",
+                "dateStart": parse_number(get_field(row, 'dateStart', 'date_start')),
+                "dateEnd": parse_number(get_field(row, 'dateEnd', 'date_end')),
+                "site": get_field(row, 'site', 'findspot', 'location') or "",
+                "region": get_field(row, 'region') or "",
+                "currentMuseum": get_field(row, 'currentMuseum', 'museum') or "",
+                "locationPrecision": get_field(row, 'locationPrecision') or "",
+                "imageUrl": clean_url(get_field(row, 'imageUrl', 'image_url', 'image')),
+                "description": get_field(row, 'description') or "",
+                "sourceCitation": citation,
+                "imageAttribution": attribution if len(attribution) > 0 else None
+            }
 
-    print(f"Converted {len(features)} fresco(es).")
-    print(f"  Wrote {geojson_path}")
-    print(f"  Wrote {js_path}")
-    print("\nRun validate_dataset.py next before wiring this into the map.")
+            features.append({
+                "type": "Feature",
+                "geometry": {
+                    "type": "Point",
+                    "coordinates": [lng, lat]
+                },
+                "properties": properties
+            })
 
+    geojson = {
+        "type": "FeatureCollection",
+        "features": features
+    }
 
-if __name__ == "__main__":
-    main()
+    os.makedirs(output_dir, exist_ok=True)
+    js_output_path = os.path.join(output_dir, 'data.js')
+
+    with open(js_output_path, mode='w', encoding='utf-8') as outfile:
+        outfile.write("const frescoesData = ")
+        json.dump(geojson, outfile, indent=2, ensure_ascii=False)
+        outfile.write(";\n")
+
+    print(f"Successfully exported {len(features)} frescoes to '{js_output_path}'")
+
+if __name__ == '__main__':
+    csv_file = sys.argv[1] if len(sys.argv) > 1 else 'frescoes_cleaned.csv'
+    output_directory = sys.argv[2] if len(sys.argv) > 2 else 'assets/js'
+    convert_csv_to_js(csv_file, output_directory)
